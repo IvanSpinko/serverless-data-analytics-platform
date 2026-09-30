@@ -1,0 +1,11 @@
+order_id,customer_id,product,category,quantity,price,order_date,country
+1001,C001,Laptop,Electronics,1,1200,2026-09-01,Ireland
+1002,C002,Mouse,Accessories,2,25,2026-09-02,Ireland
+1003,C003,Keyboard,Accessories,1,75,2026-09-03,Germany
+1004,C004,Monitor,Electronics,2,300,2026-09-04,France
+1005,C005,Laptop,Electronics,1,1200,2026-09-05,Ireland
+1006,C006,Headphones,Audio,3,80,2026-09-06,Germany
+1007,C007,Keyboard,Accessories,2,75,2026-09-07,France
+1008,C008,Monitor,Electronics,1,300,2026-09-08,Ireland
+1009,C009,Mouse,Accessories,4,25,2026-09-09,Germany
+1010,C010,Headphones,Audio,2,80,2026-09-10,France
