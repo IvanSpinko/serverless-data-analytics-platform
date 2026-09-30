@@ -1,0 +1,29 @@
+# AWS credentials
+.aws/
+credentials
+config
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# SAM / CloudFormation
+.aws-sam/
+samconfig.toml
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
