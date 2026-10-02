@@ -1,0 +1,205 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Serverless Data Analytics Platform infrastructure
+
+Resources:
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: serverless-data-analytics-ivanspinko-2026
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  GlueSalesAnalyticsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GlueSalesAnalyticsRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+
+      Policies:
+        - PolicyName: GlueSalesS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+
+              - Sid: ReadRawData
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - arn:aws:s3:::serverless-data-analytics-ivanspinko-2026/raw/*
+
+              - Sid: ProcessedDataAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - arn:aws:s3:::serverless-data-analytics-ivanspinko-2026/processed/*
+
+              - Sid: GlueScriptAndTempAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - arn:aws:s3:::serverless-data-analytics-ivanspinko-2026/scripts/*
+                  - arn:aws:s3:::serverless-data-analytics-ivanspinko-2026/temp/*
+
+              - Sid: ListBucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::serverless-data-analytics-ivanspinko-2026
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - raw/*
+                      - processed/*
+                      - scripts/*
+                      - temp/*
+  SalesDataTrigger:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: sales-data-trigger
+      Runtime: python3.12
+      Handler: index.lambda_handler
+
+      Role: arn:aws:iam::906655020884:role/service-role/sales-data-trigger-role-c06iv2wv
+
+      Code:
+        ZipFile: |
+          import json
+
+          def lambda_handler(event, context):
+              print("S3 event received:")
+              print(json.dumps(event, indent=2))
+
+              for record in event["Records"]:
+                  bucket_name = record["s3"]["bucket"]["name"]
+                  object_key = record["s3"]["object"]["key"]
+
+                  print(f"Bucket: {bucket_name}")
+                  print(f"File: {object_key}")
+
+              return {
+                  "statusCode": 200,
+                  "body": "S3 event processed successfully"
+              }
+  SalesDataETL:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: sales-data-etl
+      Role: arn:aws:iam::906655020884:role/GlueSalesAnalyticsRole
+
+      Command:
+        Name: glueetl
+        PythonVersion: '3'
+        ScriptLocation: s3://aws-glue-assets-906655020884-eu-west-1/scripts/sales-data-etl.py
+
+      GlueVersion: '5.1'
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+  SalesAnalyticsDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: '906655020884'
+      DatabaseInput:
+        Name: sales_analytics_db
+        Description: Glue Data Catalog database for sales analytics
+  SalesProcessedCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: sales-processed-crawler
+      Role: arn:aws:iam::906655020884:role/GlueSalesAnalyticsRole
+
+      DatabaseName: sales_analytics_db
+
+      Targets:
+        S3Targets:
+          - Path: s3://serverless-data-analytics-ivanspinko-2026/processed/
+
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+  AnalyticsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: serverless-data-analytics-dashboard
+      DashboardBody: |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [
+                    "AWS/Lambda",
+                    "Invocations",
+                    "FunctionName",
+                    "sales-data-trigger"
+                  ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "eu-west-1",
+                "title": "Lambda Invocations",
+                "period": 300,
+                "stat": "Sum"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "sales-data-trigger"
+                  ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "eu-west-1",
+                "title": "Lambda Errors",
+                "period": 300,
+                "stat": "Sum"
+              }
+            }
+          ]
+        }
